@@ -4,8 +4,8 @@
 
 #define DT 0.01
 
-#define KP 0.01
-#define TI 1
+#define KP 0.03
+#define TI 0.1
 #define TD 1
 
 #define P_SEIGYO 0
@@ -59,7 +59,7 @@ void motor_ccw(float);
 void motor_pwm(float);
 void init_func();
 float smooth_diff_5();
-float cal_pid();
+float cal_pid_MVd();
 
 void time_update_pid() {
   g_IREold[4] = g_IREold[3];
@@ -73,7 +73,7 @@ void time_update_pid() {
   g_ER1 = g_ER0;
   g_ER0 = g_SV - g_PV;
 
-  g_MVd = cal_pid();
+  g_MVd = cal_pid_MVd();
 
   g_MV0 = g_MV1 + g_MVd;
   g_MV1 = g_MV0;
@@ -96,30 +96,26 @@ float sigma(void) {
   return answer;
 }
 
-float cal_pid(void) {
-  float mv = 0;
+float cal_pid_MVd(void) {
+  float mvd = 0;
 
   switch (pid_select) {
     case P_SEIGYO:
-      mv = KP * g_ER0;
+      mvd = KP * (g_ER0 - g_ER1);
       break;
+
     case PI_SEIGYO:
-      g_MV1 =
-          KP * (g_ER1 + DT / (2 * TI) * sigma());
-      g_MVd = KP * ((g_ER0 - g_ER1) + DT / (2 * TI) * (g_ER0 + g_ER1) +
-                    TD / DT * (g_ER0 - 2 * g_ER1 + g_ER2));
-      mv = g_MV1 + g_MVd;
+      mvd = KP * ((g_ER0 - g_ER1) + DT / (2 * TI) * (g_ER0 + g_ER1));
       break;
+
     case PID_SEIGYO:
-      g_MV1 =
-          KP * (g_ER1 + DT / (2 * TI) * sigma() + TD / DT * (g_ER1 - g_ER2));
-      g_MVd = KP * ((g_ER0 - g_ER1) + DT / (2 * TI) * (g_ER0 + g_ER1) +
-                    TD / DT * (g_ER0 - 2 * g_ER1 + g_ER2));
-      mv = g_MV1 + g_MVd;
+      mvd = KP * ((g_ER0 - g_ER1) + DT / (2 * TI) * (g_ER0 + g_ER1) +
+                  TD / DT * (g_ER0 - 2 * g_ER1 + g_ER2));
+
       break;
   }
 
-  return mv;
+  return mvd;
 }
 
 /*
@@ -189,7 +185,7 @@ void init_g_var(void) {
     g_IREold[i] = 0;
   }
 
-  pid_select = P_SEIGYO;
+  pid_select = PI_SEIGYO;
 }
 
 /*
@@ -252,8 +248,8 @@ int main() {
     wait_us(1);  // <-ないとフリーズした…
   }
   printf("capture finished.\n");
-
   for (int j = 0; j < CAPTURE_NUM; j++) {
     printf("%d,%f\n", j, data[j]);
   }
+  printf("MODE = %d, KP = %f, TI = %f, TD = %f\n", pid_select, KP, TI, TD);
 }
