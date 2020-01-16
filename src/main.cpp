@@ -4,7 +4,7 @@
 
 #define DT 0.01
 
-#define KP 1
+#define KP 0.01
 #define TI 1
 #define TD 1
 
@@ -43,7 +43,7 @@ InterruptIn button(USER_BUTTON);
 InterruptIn input_A(D2);
 InterruptIn input_B(D3);
 
-uint16_t data[CAPTURE_NUM] = {0};
+float data[CAPTURE_NUM] = {0};
 uint16_t i = 0;  // i回目の測定
 uint16_t time_until_before_button_pushed =
     0;  //前回にボタンを押されてからの時間(ms)
@@ -101,9 +101,14 @@ float cal_pid(void) {
 
   switch (pid_select) {
     case P_SEIGYO:
-      return 1.0;
+      mv = KP * g_ER0;
       break;
     case PI_SEIGYO:
+      g_MV1 =
+          KP * (g_ER1 + DT / (2 * TI) * sigma());
+      g_MVd = KP * ((g_ER0 - g_ER1) + DT / (2 * TI) * (g_ER0 + g_ER1) +
+                    TD / DT * (g_ER0 - 2 * g_ER1 + g_ER2));
+      mv = g_MV1 + g_MVd;
       break;
     case PID_SEIGYO:
       g_MV1 =
@@ -168,7 +173,7 @@ void motor_ccw(float speed) {
 }
 
 void init_g_var(void) {
-  g_SV = 1;
+  g_SV = 0;
   g_PV = 0;
 
   g_MV0 = 0;
@@ -184,7 +189,7 @@ void init_g_var(void) {
     g_IREold[i] = 0;
   }
 
-  pid_select = PID_SEIGYO;
+  pid_select = P_SEIGYO;
 }
 
 /*
@@ -199,8 +204,9 @@ void button_timer() { time_until_before_button_pushed++; }
 */
 void init_func() {
   if (time_until_before_button_pushed < DEBOUNCE_TIME) return;
-
   time_until_before_button_pushed = 0;
+
+  g_SV = 6;
   flag_capture = true;
 }
 
@@ -223,7 +229,7 @@ void capture_count() {
     return;
   }
   if (i < CAPTURE_NUM) {
-    data[i] = g_IREval;
+    data[i] = g_PV;
     i++;
   }
 }
@@ -236,16 +242,18 @@ int main() {
   button.rise(&init_func);
   input_A.rise(&re_trigger);
   input_A.fall(&reset_input_a);
-  while (1) {
-    printf("%f\n", g_MV0);
-    wait_us(100 * 1000);
-  }
+  // while (1) {
+  //   printf("g_MV0=%f\t", g_MV0);
+  //   printf("g_PV=%f\t\n", g_PV);
+
+  //   wait_us(100 * 1000);
+  // }
   while (!flag_finished) {
     wait_us(1);  // <-ないとフリーズした…
   }
   printf("capture finished.\n");
 
   for (int j = 0; j < CAPTURE_NUM; j++) {
-    printf("%d\n", data[j]);
+    printf("%d,%f\n", j, data[j]);
   }
 }
