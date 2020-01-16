@@ -2,15 +2,17 @@
 #define DEBOUNCE_TIME 200
 #define CAPTURE_NUM 500
 
-#define DT 0.01
-
-#define KP 0.03
-#define TI 0.1
-#define TD 1
-
 #define P_SEIGYO 0
 #define PI_SEIGYO 1
 #define PID_SEIGYO 2
+
+const float DT = 0.01;
+
+float KP;
+float TI;
+float TD;
+const float KC = 0.07;
+const float TC = 4 / 33.0;
 
 float g_SV;  // 目標値
 float g_PV;  // 制御量
@@ -185,7 +187,23 @@ void init_g_var(void) {
     g_IREold[i] = 0;
   }
 
-  pid_select = PI_SEIGYO;
+  pid_select = PID_SEIGYO;
+  switch (pid_select) {
+    case P_SEIGYO:
+      KP = 0.5 * KC;
+      break;
+
+    case PI_SEIGYO:
+      KP = 0.45 * KC;
+      TI = TC / 1.2;
+      break;
+
+    case PID_SEIGYO:
+      KP = 0.6 * KC;
+      TI = TC / 2.0;
+      TD = TC / 8.0;
+      break;
+  }
 }
 
 /*
@@ -249,7 +267,7 @@ int main() {
   }
   printf("capture finished.\n");
   for (int j = 0; j < CAPTURE_NUM; j++) {
-    printf("%d,%f\n", j, data[j]);
+    printf("%f\n", data[j]);
   }
   printf("MODE = %d, KP = %f, TI = %f, TD = %f\n", pid_select, KP, TI, TD);
 }
